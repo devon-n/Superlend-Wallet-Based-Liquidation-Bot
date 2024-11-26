@@ -1,0 +1,29 @@
+{
+  "name": "aave-v3-liquidation-bot",
+  "version": "1.0.0",
+  "description": "A liquidation bot for Aave V3 using ethers.js",
+  "main": "liquidationBot.ts",
+  "scripts": {
+    "start": "ts-node liquidationBot.ts",
+    "build": "tsc",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "aave",
+    "liquidation",
+    "ethereum",
+    "defi"
+  ],
+  "author": "Superlend",
+  "license": "MIT",
+  "dependencies": {
+    "@libsql/client": "^0.10.0",
+    "axios": "^1.7.4",
+    "ethers": "^5.7.2"
+  },
+  "devDependencies": {
+    "@types/node": "^18.15.11",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.0.4"
+  }
+}
