@@ -1,12 +1,12 @@
 import { ethers } from 'ethers';
 
 export const config = {
-  rpcUrl: 'https://node.ghostnet.etherlink.com',
+  rpcUrl: 'https://node.mainnet.etherlink.com',
   privateKey: '',
-  aavePoolAddress: '0xB0462c142FE3dEEDA33C6Dad2528C509A009136D',
+  aavePoolAddress: '0x3bD16D195786fb2F509f2E2D7F69920262EF114D',
   healthFactorThreshold: ethers.utils.parseUnits('1', 18),
   gasLimit: 500000,
   gasPrice: ethers.utils.parseUnits('50', 'gwei'),
-  aaveDataProviderAddress: '0xb46D15E68Eb5a9b5712828D46293A690b2977464', 
-  aaveOracleAddress: '0x1a1aAcEe1a75d3bDAEB9EF27430b05c665d58891', 
+  aaveDataProviderAddress: '0x99e8269dDD5c7Af0F1B3973A591b47E8E001BCac', 
+  aaveOracleAddress: '0xeCF313dE38aA85EF618D06D1A602bAa917D62525', 
 };

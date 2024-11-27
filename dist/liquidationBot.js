@@ -11,11 +11,11 @@ async function main() {
     while (true) {
         try {
             console.log('Checking for unhealthy positions...');
-            const unhealthyPositions = await (0, aaveUtils_1.getUnhealthyPositions)(provider);
+            const unhealthyPositions = await (0, aaveUtils_1.getUnhealthyPositions)();
             console.log(`Found ${unhealthyPositions.length} unhealthy positions`);
             for (const userAddress of unhealthyPositions) {
                 console.log(`Attempting to liquidate position: ${userAddress}`);
-                await (0, aaveUtils_1.liquidatePosition)(wallet, userAddress);
+                await (0, aaveUtils_1.liquidatePosition)(wallet, userAddress.userAddress, userAddress.totalDebtValueInUsd, userAddress.leadingCollateralReserve, userAddress.leadingDebtReserve);
             }
             console.log('Waiting before next check...');
         }

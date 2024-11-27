@@ -18,7 +18,7 @@ export async function getUnhealthyPositions(): Promise<Array<{ userAddress: stri
 
   try {
     const result = await client.execute({
-      sql: "SELECT user_address, health_factor, totalDebtValueInUsd, leadingCollateralReserve, leadingDebtReserve FROM USER_5",
+      sql: "SELECT user_address, health_factor, totalDebtValueInUsd, leadingCollateralReserve, leadingDebtReserve FROM USER_2",
       args: []
     });
 
@@ -60,8 +60,8 @@ export async function liquidatePosition(wallet: ethers.Wallet, userAddress: stri
         console.log(`Liquidation is profitable for user: ${userAddress}`);
         console.log(`Attempting liquidation call for user: ${userAddress}`);
         console.log("max uint", ethers.constants.MaxUint256);
-        const usdcContract = new ethers.Contract('0x8DEF68408Bc96553003094180E5C90d9fe5b88C1', ['function approve(address spender, uint256 amount) public returns (bool)'], wallet);
-        const approveTx = await usdcContract.approve(config.aavePoolAddress, ethers.constants.MaxUint256);
+        const debtTokenContract = new ethers.Contract(leadingDebtReserve, ['function approve(address spender, uint256 amount) public returns (bool)'], wallet);
+        const approveTx = await debtTokenContract.approve(config.aavePoolAddress, ethers.constants.MaxUint256);
         console.log('Waiting for approval transaction to be mined...');
         await approveTx.wait(1);
         console.log('Approval transaction confirmed');
@@ -85,6 +85,8 @@ export async function liquidatePosition(wallet: ethers.Wallet, userAddress: stri
   }
   
   console.log(`Exiting liquidatePosition for user: ${userAddress}`);
+  // sleep for 1 minute
+  await new Promise(resolve => setTimeout(resolve, 30000));
 }
 
 async function calculateProfit(wallet: ethers.Wallet, userAddress: string, healthFactor: ethers.BigNumber, eMode: BigNumber): Promise<boolean> {

@@ -3,12 +3,12 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.config = void 0;
 const ethers_1 = require("ethers");
 exports.config = {
-    rpcUrl: 'https://node.ghostnet.etherlink.com',
+    rpcUrl: 'https://node.mainnet.etherlink.com',
     privateKey: '8c472157d4f384a6665e1b495b79f80814f8d4e71527c1d6c7855f976ef58d89',
-    aavePoolAddress: '0xB0462c142FE3dEEDA33C6Dad2528C509A009136D',
-    healthFactorThreshold: ethers_1.ethers.utils.parseUnits('1', 18), // 1.0 in Wei
+    aavePoolAddress: '0x3bD16D195786fb2F509f2E2D7F69920262EF114D',
+    healthFactorThreshold: ethers_1.ethers.utils.parseUnits('1', 18),
     gasLimit: 500000,
-    gasPrice: ethers_1.ethers.utils.parseUnits('50', 'gwei'), // Adjust as needed
-    aaveDataProviderAddress: '0xb46D15E68Eb5a9b5712828D46293A690b2977464',
-    aaveOracleAddress: '0x1a1aAcEe1a75d3bDAEB9EF27430b05c665d58891',
+    gasPrice: ethers_1.ethers.utils.parseUnits('50', 'gwei'),
+    aaveDataProviderAddress: '0x99e8269dDD5c7Af0F1B3973A591b47E8E001BCac',
+    aaveOracleAddress: '0xeCF313dE38aA85EF618D06D1A602bAa917D62525',
 };

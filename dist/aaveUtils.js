@@ -10,52 +10,61 @@ const config_1 = require("./config");
 const PoolABI_json_1 = __importDefault(require("./PoolABI.json"));
 const PoolDataProvider_json_1 = __importDefault(require("./PoolDataProvider.json"));
 const AaveOracle_json_1 = __importDefault(require("./AaveOracle.json"));
+const client_1 = require("@libsql/client");
 const AAVE_POOL_ABI = PoolABI_json_1.default;
 const AAVE_DATA_PROVIDER_ABI = PoolDataProvider_json_1.default;
 const AAVE_ORACLE_ABI = AaveOracle_json_1.default;
-async function getUnhealthyPositions(provider) {
-    const aavePool = new ethers_1.ethers.Contract(config_1.config.aavePoolAddress, AAVE_POOL_ABI, provider);
-    const dataProvider = new ethers_1.ethers.Contract(config_1.config.aaveDataProviderAddress, AAVE_DATA_PROVIDER_ABI, provider);
-    const unhealthyPositions = [];
-    // Get all users with borrowed positions
-    // const users = await dataProvider.getUsersWithBorrowedPositions();
-    // for (const user of users) {
-    //   const { healthFactor } = await aavePool.getUserAccountData(user);
-    //   if (healthFactor.lt(config.healthFactorThreshold)) {
-    //     unhealthyPositions.push(user);
-    //   }
-    // }
-    return ['0x2b112F430D725897A0B6f55A582fe122d21F4EF7'];
+async function getUnhealthyPositions() {
+    const client = (0, client_1.createClient)({
+        url: "http://localhost:8080"
+    });
+    try {
+        const result = await client.execute({
+            sql: "SELECT user_address, health_factor, totalDebtValueInUsd, leadingCollateralReserve, leadingDebtReserve FROM USER_7",
+            args: []
+        });
+        const unhealthyPositions = result.rows.map(row => ({
+            userAddress: row.user_address,
+            healthFactor: row.health_factor,
+            totalDebtValueInUsd: row.totalDebtValueInUsd,
+            leadingCollateralReserve: row.leadingCollateralReserve,
+            leadingDebtReserve: row.leadingDebtReserve
+        }));
+        console.log("unhealthyPositions", unhealthyPositions);
+        return unhealthyPositions;
+    }
+    catch (error) {
+        console.error('Error fetching unhealthy positions:', error);
+        return [];
+    }
+    finally {
+        await client.close();
+    }
 }
-async function liquidatePosition(wallet, userAddress) {
+async function liquidatePosition(wallet, userAddress, totalDebtValueInUsd, leadingCollateralReserve, leadingDebtReserve) {
     console.log(`Entering liquidatePosition for user: ${userAddress}`);
     const aavePool = new ethers_1.ethers.Contract(config_1.config.aavePoolAddress, AAVE_POOL_ABI, wallet);
     try {
         console.log(`Fetching user account data for: ${userAddress}`);
         const { healthFactor } = await aavePool.getUserAccountData(userAddress);
-        let HF = healthFactor.toString() / 10 ** 18;
-        console.log(`Health factor for ${userAddress}: ${HF}`);
+        const adjustedHealthFactor = healthFactor.div(ethers_1.ethers.BigNumber.from(10).pow(18));
+        console.log(`Health factor for ${userAddress}: ${healthFactor.toString()}`);
         const eMode = await aavePool.getUserEMode(userAddress);
         console.log(`E-Mode for ${userAddress}: ${eMode}`);
-        if (HF < 1) {
+        if ((adjustedHealthFactor.lt(ethers_1.ethers.BigNumber.from(1)) && totalDebtValueInUsd > 0.01)) {
             console.log(`Calculating profit for user: ${userAddress}`);
-            const isLiquidationProfitable = await calculateProfit(wallet, userAddress, healthFactor, eMode);
-            // if (isLiquidationProfitable) {
             console.log(`Liquidation is profitable for user: ${userAddress}`);
-            // In a real scenario, you'd need to determine the optimal collateralAsset, debtAsset, and debtToCover
-            // This is a simplified example
             console.log(`Attempting liquidation call for user: ${userAddress}`);
-            const tx = await aavePool.liquidationCall('0x6bDE94725379334b469449f4CF49bCfc85ebFb27', // Example: WETH address
-            '0x8DEF68408Bc96553003094180E5C90d9fe5b88C1', // Example: USDC address
-            userAddress, ethers_1.ethers.constants.MaxUint256, // Example: Liquidate 100 USDC worth of debt
-            false // Don't receive aTokens
-            );
+            console.log("max uint", ethers_1.ethers.constants.MaxUint256);
+            const usdcContract = new ethers_1.ethers.Contract(leadingDebtReserve, ['function approve(address spender, uint256 amount) public returns (bool)'], wallet);
+            const approveTx = await usdcContract.approve(config_1.config.aavePoolAddress, ethers_1.ethers.constants.MaxUint256);
+            console.log('Waiting for approval transaction to be mined...');
+            await approveTx.wait(1);
+            console.log('Approval transaction confirmed');
+            const tx = await aavePool['liquidationCall(address,address,address,uint256,bool)'](leadingCollateralReserve, leadingDebtReserve, userAddress, '1000000000000000000', false);
             console.log(`Waiting for transaction to be mined...`);
-            await tx.wait();
+            tx.wait(2);
             console.log(`Liquidation successful for user: ${userAddress}`);
-            // } else {
-            //   console.log(`Liquidation not profitable for user: ${userAddress}`);
-            // }
         }
         else {
             console.log(`Health factor ${ethers_1.ethers.utils.formatUnits(healthFactor, 18)} is above threshold for user: ${userAddress}`);
@@ -65,6 +74,8 @@ async function liquidatePosition(wallet, userAddress) {
         console.error(`Error in liquidatePosition for user ${userAddress}:`, error);
     }
     console.log(`Exiting liquidatePosition for user: ${userAddress}`);
+    // sleep for 1 minute
+    await new Promise(resolve => setTimeout(resolve, 60000));
 }
 async function calculateProfit(wallet, userAddress, healthFactor, eMode) {
     const aavePool = new ethers_1.ethers.Contract(config_1.config.aavePoolAddress, AAVE_POOL_ABI, wallet);
@@ -100,8 +111,10 @@ async function calculateProfit(wallet, userAddress, healthFactor, eMode) {
         console.log('No suitable collateral or debt found');
         return false;
     }
-    const liquidationBonus = eMode === 1 ? ethers_1.ethers.BigNumber.from(10100) : ethers_1.ethers.BigNumber.from(10500);
+    const liquidationBonus = eMode.eq(1) ? ethers_1.ethers.BigNumber.from(10100) : ethers_1.ethers.BigNumber.from(10500);
     const liquidationBonusBase = ethers_1.ethers.BigNumber.from(10000);
+    console.log("debt-data", debtData.balance.toString());
+    console.log("collateral-data", collateralData.balance.toString());
     const maxCollateralToLiquidate = debtData.valueInEth.mul(liquidationBonus).div(liquidationBonusBase).div(collateralData.valueInEth);
     console.log(`Max collateral to liquidate: ${ethers_1.ethers.utils.formatEther(maxCollateralToLiquidate)} ETH`);
     const gasCost = await estimateGasCost(wallet);
