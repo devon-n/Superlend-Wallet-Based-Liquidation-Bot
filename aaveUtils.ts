@@ -5,31 +5,33 @@ import PoolABI from './PoolABI.json';
 import PoolDataProvider from './PoolDataProvider.json';
 import AaveOracle from './AaveOracle.json';
 import { L2Pool } from './L2Pool';
-import { createClient } from "@libsql/client";
+import { Pool } from 'pg';
+import dotenv from 'dotenv';
+dotenv.config()
 
 const AAVE_POOL_ABI = PoolABI;
 const AAVE_DATA_PROVIDER_ABI = PoolDataProvider;
 const AAVE_ORACLE_ABI = AaveOracle;
 
 export async function getUnhealthyPositions(): Promise<Array<{ userAddress: string, healthFactor: number, totalDebtValueInUsd: number, leadingCollateralReserve: string, leadingDebtReserve: string }>> {
-  const client = createClient({
-    url: "http://localhost:8080"
+  const pool = new Pool({
+    connectionString: process.env.DATABASE_URL as string,
   });
 
   try {
-    const result = await client.execute({
-      sql: "SELECT user_address, health_factor, totalDebtValueInUsd, leadingCollateralReserve, leadingDebtReserve FROM USER_2",
-      args: []
-    });
+    const result = await pool.query(`
+      SELECT user_address, health_factor, "totalDebtValueInUsd", "leadingCollateralReserve", "leadingDebtReserve"
+      FROM USER_2
+    `);
 
-    const unhealthyPositions = result.rows.map(row => ({
+    const unhealthyPositions = result.rows.map((row: any) => ({
       userAddress: row.user_address as string,
       healthFactor: row.health_factor as number,
       totalDebtValueInUsd: row.totalDebtValueInUsd as number,
       leadingCollateralReserve: row.leadingCollateralReserve as string,
       leadingDebtReserve: row.leadingDebtReserve as string
     }));
-    console.log("unhealthyPositions",unhealthyPositions);
+    console.log("unhealthyPositions", unhealthyPositions);
     return unhealthyPositions;
 
   } catch (error) {
@@ -37,21 +39,21 @@ export async function getUnhealthyPositions(): Promise<Array<{ userAddress: stri
     return [];
 
   } finally {
-    await client.close();
+    await pool.end();
   }
 }
 
 export async function liquidatePosition(wallet: ethers.Wallet, userAddress: string, totalDebtValueInUsd: number, leadingCollateralReserve: string, leadingDebtReserve: string) {
   console.log(`Entering liquidatePosition for user: ${userAddress}`);
   const aavePool = <L2Pool> new ethers.Contract(config.aavePoolAddress, AAVE_POOL_ABI, wallet);
-  
+
   try {
     console.log(`Fetching user account data for: ${userAddress}`);
     const { healthFactor } = await aavePool.getUserAccountData(userAddress);
     const adjustedHealthFactor = healthFactor.div(ethers.BigNumber.from(10).pow(18));
 
     console.log(`Health factor for ${userAddress}: ${healthFactor.toString()}`);
-    
+
     const eMode = await aavePool.getUserEMode(userAddress);
     console.log(`E-Mode for ${userAddress}: ${eMode}`);
 
@@ -68,7 +70,7 @@ export async function liquidatePosition(wallet: ethers.Wallet, userAddress: stri
 
         const tx = await aavePool['liquidationCall(address,address,address,uint256,bool)'](
           leadingCollateralReserve,
-          leadingDebtReserve, 
+          leadingDebtReserve,
           userAddress,
           '1000000000000000000',
           false
@@ -83,7 +85,7 @@ export async function liquidatePosition(wallet: ethers.Wallet, userAddress: stri
   } catch (error) {
     console.error(`Error in liquidatePosition for user ${userAddress}:`, error);
   }
-  
+
   console.log(`Exiting liquidatePosition for user: ${userAddress}`);
   // sleep for 1 minute
   await new Promise(resolve => setTimeout(resolve, 30000));
