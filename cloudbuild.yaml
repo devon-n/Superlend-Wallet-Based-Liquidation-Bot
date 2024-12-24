@@ -1,0 +1,44 @@
+substitutions:
+  _PROJECT_ID: tba
+  _REGION: europe-west2
+  _FUNCTION_NAME: superlend_liquidation_bot
+  _SCHEDULE: '*/5 * * * *'
+  _HTTP_TARGET: 'https://${_REGION}-${_PROJECT_ID}.cloudfunctions.net/${_FUNCTION_NAME}'
+  _JOB_NAME: superlend_liquidation_bot
+
+steps:
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['build',
+        '-t', 'gcr.io/${_PROJECT_ID}/${_FUNCTION_NAME}',
+        '.']
+
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['push', 'gcr.io/${_PROJECT_ID}/${_FUNCTION_NAME}']
+
+- name: 'gcr.io/cloud-builders/gcloud'
+  args: ['run', 'deploy',
+        '--image', 'gcr.io/${_PROJECT_ID}/${_FUNCTION_NAME}',
+        '--platform=managed',
+        '--allow-unauthenticated',
+        '--region', '${_REGION}']
+
+- name: 'gcr.io/cloud-builders/gcloud'
+  args: ['scheduler', 'jobs', 'describe', '${_JOB_NAME}', '--location', '${_REGION}']
+  outputs:
+    exit-code: exit-code
+
+- name: 'gcr.io/cloud-builders/gcloud'
+  args: ['scheduler', 'jobs', 'create',
+        '${_JOB_NAME}',
+        '--schedule', '${_SCHEDULE}',
+        '--http-target', '${_HTTP_TARGET}',
+        '--location', '${_REGION}']
+  entry-point: '$(eqs $(steps.*.exit-code) 0)'
+
+- name: 'gcr.io/cloud-builders/gcloud'
+  args: ['scheduler', 'jobs', 'update',
+        '${_JOB_NAME}',
+        '--schedule', '${_SCHEDULE}',
+        '--http-target', '${_HTTP_TARGET}',
+        '--location', '${_REGION}']
+  entry-point: '$(not $(eqs $(steps.*.exit-code) 0))'
